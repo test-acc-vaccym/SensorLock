@@ -1,7 +1,13 @@
 package com.example.android.accelerometerplay;
 
+import java.text.DecimalFormat;
+import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
+
 import android.support.v7.app.ActionBarActivity;
 import android.support.v7.app.AppCompatActivity;
+import android.text.method.ScrollingMovementMethod;
 import android.app.AlertDialog;
 import android.app.admin.DevicePolicyManager;
 import android.content.ComponentName;
@@ -13,6 +19,8 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.media.AudioManager;
+import android.media.ToneGenerator;
 import android.os.Bundle;
 import android.view.Display;
 import android.view.Menu;
@@ -26,12 +34,14 @@ import android.widget.CheckBox;
 import android.widget.Checkable;
 import android.widget.CompoundButton;
 import android.widget.CompoundButton.OnCheckedChangeListener;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
 public class ActionBarTestActivity extends AppCompatActivity implements SensorEventListener, OnCheckedChangeListener, OnClickListener {
 	TextView sensor1Lbl;
 	TextView sensor2Lbl;
+	TextView sensor3Lbl;
 	//TextView sensorSnap;
 	TextView xField;
 	TextView yField;
@@ -40,15 +50,19 @@ public class ActionBarTestActivity extends AppCompatActivity implements SensorEv
 	TextView yField2;
 	TextView zField2;
 	CheckBox isTracking;
+	EditText logFld;
 	
 	Context context;
     private SensorManager mSensorManager;
     private Display mDisplay;
     private Sensor mAccelerometer;
+    private Sensor mProximtySnsr;
+    private Sensor mLightSnsr;
+
     private DevicePolicyManager mDevicePolicyManager;
     private ComponentName mComponentName;
     
-	String myVersion = "not available"; // initialize String
+	private String myVersion = "not available"; // initialize String
 	private float mSensorX;
 	private float mSensorY;
 	private float mSensorZ;
@@ -59,6 +73,11 @@ public class ActionBarTestActivity extends AppCompatActivity implements SensorEv
 	private float minZ=Float.MAX_VALUE;
 	private float maxZ=Float.MIN_VALUE;
 	
+	private String currentLog = "";
+	private Timer t;
+    private int timeCounter;
+	private int surfaceRotation;
+    
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -72,6 +91,8 @@ public class ActionBarTestActivity extends AppCompatActivity implements SensorEv
 		super.onResume();
 		if (isTracking.isChecked()) {
 			mSensorManager.registerListener(this, mAccelerometer, SensorManager.SENSOR_DELAY_UI);
+			mSensorManager.registerListener(this, mProximtySnsr, SensorManager.SENSOR_DELAY_UI);
+			mSensorManager.registerListener(this, mLightSnsr, SensorManager.SENSOR_DELAY_UI);   
 		}
 	} 
 
@@ -79,6 +100,8 @@ public class ActionBarTestActivity extends AppCompatActivity implements SensorEv
 	protected void onPause() {
 		super.onPause();
 		mSensorManager.unregisterListener(this, mAccelerometer);
+		mSensorManager.unregisterListener(this, mProximtySnsr);
+		mSensorManager.unregisterListener(this, mLightSnsr);
 	}
 	
 	@Override
@@ -119,36 +142,46 @@ public class ActionBarTestActivity extends AppCompatActivity implements SensorEv
 		case Sensor.TYPE_ACCELEROMETER:
 	        switch (mDisplay.getRotation()) {
 	        case Surface.ROTATION_0:
+	        	surfaceRotation = 0;
 	            mSensorX = event.values[0];
 	            mSensorY = event.values[1];
 	            mSensorZ = event.values[2];
 	            break;
 	        case Surface.ROTATION_90:
-	            mSensorX = -event.values[1];
+	        	surfaceRotation = 1;
+	        	mSensorX = event.values[1]; //mSensorX = -event.values[1];
 	            mSensorY = event.values[0];
 	            mSensorZ = event.values[2];
 	            break;
 	        case Surface.ROTATION_180:
-	            mSensorX = -event.values[0];
-	            mSensorY = -event.values[1];
+	        	surfaceRotation = 2; 
+	        	mSensorX = event.values[0]; //mSensorX = -event.values[0];
+	        	mSensorY = event.values[1]; // mSensorY = -event.values[1];
 	            mSensorZ = event.values[2];
 	            break;
 	        case Surface.ROTATION_270:
+	        	surfaceRotation = 3;
 	            mSensorX = event.values[1];
-	            mSensorY = -event.values[0];
+	            mSensorY = event.values[0]; // mSensorY = -event.values[0];
 	            mSensorZ = event.values[2];
 	            break;
 	        }
-	        if (mSensorX < minX) minX=mSensorX;
+	        
+	        /*if (mSensorX < minX) minX=mSensorX;
 	        if (mSensorX > maxX) maxX=mSensorX;
 	        if (mSensorY < minY) minY=mSensorY;
 	        if (mSensorY > maxY) maxY=mSensorY;
 	        if (mSensorZ < minZ) minZ=mSensorZ;
 	        if (mSensorZ > maxZ) maxZ=mSensorZ;
 
-	        xField.setText(mSensorX + "_" + minX + "/" + maxX + "_");
-	        yField.setText(mSensorY + "_" + minY + "/" + maxY + "_");
-	        zField.setText(mSensorZ + "_" + minZ + "/" + maxZ + "_");
+	        xField.setText(round(mSensorX) + "_" + round(minX) + "/" + round(maxX) + "_");
+	        yField.setText(round(mSensorY) + "_" + round(minY) + "/" + round(maxY) + "_");
+	        zField.setText(round(mSensorZ) + "_" + round(minZ) + "/" + round(maxZ) + "_");*/
+	        xField.setText(round(mSensorX) + "");
+	        yField.setText(round(mSensorY) + "");
+	        zField.setText(round(mSensorZ) + "");
+	        
+	        sensor3Lbl.setText((surfaceRotation * 90) + "\u00b0");
 			break;
 		case Sensor.TYPE_PROXIMITY:
 			sensor1Lbl.setText("Prxmty:" + event.values[0]);
@@ -161,6 +194,7 @@ public class ActionBarTestActivity extends AppCompatActivity implements SensorEv
 			System.out.println("Unknown Sensor " + event.sensor.getName() + "/" + event.sensor.getType() + "/" + event.values[0]);
 			break;
 		}
+		
 	}
 
 	@Override
@@ -173,14 +207,19 @@ public class ActionBarTestActivity extends AppCompatActivity implements SensorEv
 	public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
 		if (isChecked) {
 			mSensorManager.registerListener(this, mAccelerometer, SensorManager.SENSOR_DELAY_UI);
+			mSensorManager.registerListener(this, mProximtySnsr, SensorManager.SENSOR_DELAY_UI);
+			mSensorManager.registerListener(this, mLightSnsr, SensorManager.SENSOR_DELAY_UI);   
 		} else {
 			mSensorManager.unregisterListener(this, mAccelerometer);
+			mSensorManager.unregisterListener(this, mProximtySnsr);
+			mSensorManager.unregisterListener(this, mLightSnsr);
 		}
 	}
 	
 	@Override
 	public void onClick(View view) {
 		System.out.println("clicked");
+		Button but;
 		switch (view.getId()) {
 		case R.id.button1:
 			boolean isAdmin = mDevicePolicyManager.isAdminActive(mComponentName);
@@ -193,12 +232,12 @@ public class ActionBarTestActivity extends AppCompatActivity implements SensorEv
 			break;
 		case R.id.button2:
 			// this stores a snapshot of current x,y,z values into the 3 fields. 
-			Button but = (Button) view;
+			but = (Button) view;
 			if ("Snap".equalsIgnoreCase(but.getText().toString())) {
-				but.setText("Clear");
-				xField2.setText(mSensorX + "*");
-				yField2.setText(mSensorY + "*");
-				zField2.setText(mSensorZ + "*");				
+				but.setText("Clear");				
+				xField2.setText(round(Math.toDegrees(Math.atan(mSensorZ/mSensorX))) + "\u00b0 " + round(mSensorX) + "_");
+				yField2.setText((surfaceRotation*90) + getBtoAAngle(mSensorX, mSensorY) + "\u00b0 " + round(mSensorY) + "_");
+				zField2.setText(round(Math.toDegrees(Math.atan(mSensorZ/mSensorY))) + "\u00b0 " + round(mSensorZ) + "_");				
 			} else if ("Clear".equalsIgnoreCase(but.getText().toString())) {
 				but.setText("Snap");
 				xField2.setText("");
@@ -207,23 +246,78 @@ public class ActionBarTestActivity extends AppCompatActivity implements SensorEv
 			}
 			
 			break;
+		case R.id.button3:
+			// This initiates 10 snapshots, 1 every x seconds
+			((Button) view).setEnabled(false);
+			timeCounter=0;
+			if (t != null) {
+				t.cancel();
+			}
+			t = new Timer();
+		    t.scheduleAtFixedRate(new TimerTask() {
+
+		        @Override
+		        public void run() {
+		            // TODO Auto-generated method stub
+		            runOnUiThread(new Runnable() {
+
+						public void run() {
+		                    timeCounter++;
+		                    if (timeCounter<=10) {
+		                    	String xAngle = round(Math.toDegrees(Math.atan(mSensorZ/mSensorX))) + "\u00b0 ";
+		        				String yAngle = getBtoAAngle(mSensorX, mSensorY) + "\u00b0 ";
+		        				String zAngle = round(Math.toDegrees(Math.atan(mSensorZ/mSensorY))) + "\u00b0 ";
+		                    	doLog(timeCounter + ": (" + round(mSensorX) + " , " + round(mSensorY) + " , " + round(mSensorZ)
+		                    		+ "\t (" + xAngle + " , " + yAngle + " , " + zAngle + ")");
+		
+		                    	try {
+		                    	ToneGenerator toneG = new ToneGenerator(AudioManager.STREAM_ALARM, 80);
+		                    	toneG.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 500); 
+		                    	} catch (Exception e) {
+		                    		doLog(e.toString());
+		                    	}
+		                    	if (timeCounter>=10) {
+		                    		t.cancel();
+			                    	t = null;
+			                    	((Button)findViewById(R.id.button3)).setEnabled(true);	
+		                    	}
+		                    } else {
+		                    	// this code will probably never be reached but just here as a safety to turn off the timer.
+	                    		t.cancel();
+		                    	t = null;
+		                    	((Button)findViewById(R.id.button3)).setEnabled(true);
+		                    }
+		                }
+		            });
+
+		        }
+		    }, 1000, 3000); // 1000 means start from 1 sec, and the second 3000 is do the loop each 3 sec.
+			break;
+		case R.id.button4:
+			clearLog();
+			break;
 		}
 		
 	}
-	
+
 	private void initMain() {
 		context = getApplicationContext(); // or activity.getApplicationContext()
+		setContentView(R.layout.activity_action_bar_test);
+		
+		// this is really UI but because logging is so important, doing it first
+		logFld = (EditText) findViewById(R.id.logFld);
+		logFld.setMovementMethod(new ScrollingMovementMethod()); // this is required to enable scrolling
 		
         // Get an instance of the SensorManager
         mSensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+        
         // Register listener for acccelrometer
         mAccelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-        // register listeners for proximity and light sensors
-        Sensor sensor = mSensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY);
-		mSensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_UI);
-		sensor = mSensorManager.getDefaultSensor(Sensor.TYPE_LIGHT);
-		mSensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_UI);        
         
+        // register listeners for proximity and light sensors
+        mProximtySnsr = mSensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY);		
+		mLightSnsr = mSensorManager.getDefaultSensor(Sensor.TYPE_LIGHT);
+		             
         // Get an instance of the WindowManager
 	    WindowManager mWindowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         mDisplay = mWindowManager.getDefaultDisplay(); // this will be used later for getting orientation
@@ -244,11 +338,10 @@ public class ActionBarTestActivity extends AppCompatActivity implements SensorEv
 	}
 	
 	private void initUI() {
-		setContentView(R.layout.activity_action_bar_test);
-		
 		// init controls
 		sensor1Lbl = (TextView) findViewById(R.id.Sensor1);
 		sensor2Lbl = (TextView) findViewById(R.id.Sensor2);
+		sensor3Lbl = (TextView) findViewById(R.id.Sensor3);
 		xField = (TextView) findViewById(R.id.xValue);
         yField = (TextView) findViewById(R.id.yValue);
         zField = (TextView) findViewById(R.id.zValue);
@@ -263,6 +356,18 @@ public class ActionBarTestActivity extends AppCompatActivity implements SensorEv
         a.setOnClickListener(this);
         a = (Button)findViewById(R.id.button2);
         a.setOnClickListener(this);
+        a = (Button)findViewById(R.id.button3);
+        a.setOnClickListener(this);
+        a = (Button)findViewById(R.id.button4);
+        a.setOnClickListener(this);
+        
+        StringBuilder sb = new StringBuilder();
+		for (Sensor sensor : mSensorManager.getSensorList(Sensor.TYPE_ALL)) {
+			sb.append("************\r\n");
+			sb.append(sensor).append("\r\n");
+		}
+		
+		doLog(sb.toString());
 	}
 	
 	private void initOthers() {
@@ -272,7 +377,7 @@ public class ActionBarTestActivity extends AppCompatActivity implements SensorEv
 
 		try {
 			myVersion = packageManager.getPackageInfo(packageName, 0).versionName
-					+ "("
+					+ " ("
 					+ packageManager.getPackageInfo(packageName, 0).versionCode
 					+ ")";
 		} catch (PackageManager.NameNotFoundException e) {
@@ -302,7 +407,32 @@ public class ActionBarTestActivity extends AppCompatActivity implements SensorEv
 
 		 builder.create().show();		 
 	}
-	
 
+	DecimalFormat twoDForm = new DecimalFormat("#.##");
+	/**
+	 * This method rounds to 2 decimal places
+	 * @param val
+	 * @return
+	 */
+	private float round(float val) {
+        return Float.valueOf(twoDForm.format(val));
+	}
+	private float round(double val) {
+        return Float.valueOf(twoDForm.format(val));
+	}
+    
+    private void doLog(String log) {
+    	currentLog = log + "\r\n" + currentLog;
+    	logFld.setText(currentLog);
+    }
+    
+    private void clearLog() {
+    	currentLog = "";
+    	logFld.setText(currentLog);
+    }
+    
 	
+	private float getBtoAAngle(float aValue, float bValue) {
+		return round(Math.toDegrees(Math.atan(aValue / bValue)));
+	}
 }
